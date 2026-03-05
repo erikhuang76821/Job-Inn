@@ -1,0 +1,1262 @@
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { 
+  Search, Plus, Building2, Briefcase, DollarSign, MapPin, 
+  CheckCircle, XCircle, Shield, Menu, User, Clock, Send, 
+  Loader2, Settings, Edit3, Save, Users, AlertTriangle, 
+  Megaphone, ToggleLeft, ToggleRight, ThumbsUp, ThumbsDown, 
+  MessageSquare, Trash2, Database, Activity, Server, Code,
+  Lock, LogIn, Filter, SortAsc, SortDesc, Laptop, Factory,
+  MoreHorizontal, PenLine, ChevronUp, ChevronDown, Landmark,
+  Sparkles, Layout, Home, FileText, PlusCircle, SlidersHorizontal,
+  ArrowLeft, TrendingUp, MessageCircle, BarChart3, GripHorizontal
+} from 'lucide-react';
+
+// Firebase Imports
+import { initializeApp } from "firebase/app";
+import { 
+  getFirestore, collection, addDoc, query, where, onSnapshot, 
+  orderBy, updateDoc, doc, deleteDoc, serverTimestamp, 
+  arrayUnion, arrayRemove, runTransaction, getDoc, setDoc
+} from "firebase/firestore";
+import { 
+  getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut 
+} from "firebase/auth";
+
+// --- Firebase Configuration ---
+// 使用環境變數或回退到空物件，確保在沒有配置的情況下也能運行（雖然會報錯，但符合原程式碼邏輯）
+const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'salary-app-v11-notebook';
+
+// --- Mock Data Generators ---
+const generateCompanies = () => [
+  { 
+    id: 'c1', name: 'Google', aliases: ['谷歌', '美商科高', 'google'], industry: '軟體/網路',
+    stats: { median: 1850000, avg: 2200000, count: 450, year: 112 }
+  },
+  { 
+    id: 'c2', name: 'TSMC 台積電', aliases: ['tsmc', '台灣積體電路', '台積'], industry: '半導體/電子',
+    stats: { median: 2500000, avg: 3170000, count: 60000, year: 112 }
+  },
+  { 
+    id: 'c3', name: 'MediaTek 聯發科', aliases: ['mediatek', '發哥', '聯發科技'], industry: '半導體/電子',
+    stats: { median: 3000000, avg: 3800000, count: 12000, year: 112 }
+  },
+  { id: 'c4', name: 'Shopee 蝦皮', aliases: ['shopee', '蝦皮購物', '樂購蝦皮'], industry: '電商/零售', stats: { median: 1100000, avg: 1300000, count: 800, year: 112 } },
+  { id: 'c5', name: 'LINE Taiwan', aliases: ['line', '連線', '台灣連線'], industry: '軟體/網路', stats: { median: 1600000, avg: 1900000, count: 600, year: 112 } },
+  { id: 'c6', name: 'Uber', aliases: ['優步'], industry: '軟體/網路', stats: { median: 1700000, avg: 2100000, count: 200, year: 112 } },
+  { id: 'c7', name: 'Foodpanda', aliases: ['富胖達', '熊貓'], industry: '軟體/網路', stats: { median: 900000, avg: 1100000, count: 500, year: 112 } },
+  { id: 'c8', name: 'ASUS 華碩', aliases: ['asus', '華碩電腦'], industry: '半導體/電子', stats: { median: 1300000, avg: 1600000, count: 8000, year: 112 } },
+  { id: 'c9', name: 'Acer 宏碁', aliases: ['acer'], industry: '半導體/電子', stats: { median: 1150000, avg: 1400000, count: 5000, year: 112 } },
+  { id: 'c10', name: 'Trend Micro 趨勢科技', aliases: ['trend', '趨勢'], industry: '軟體/網路', stats: { median: 1550000, avg: 1800000, count: 1500, year: 112 } },
+  { id: 'c11', name: 'Dcard', aliases: ['狄卡'], industry: '軟體/網路', stats: { median: 950000, avg: 1100000, count: 300, year: 112 } },
+  { id: 'c12', name: 'Momo 富邦媒', aliases: ['momo', '富邦媒體'], industry: '電商/零售', stats: { median: 850000, avg: 1000000, count: 2000, year: 112 } },
+  { id: 'c13', name: '國泰世華', aliases: ['cathay', '國泰金控'], industry: '金融/銀行', stats: { median: 1050000, avg: 1250000, count: 9000, year: 112 } },
+  { id: 'c14', name: '中國信託', aliases: ['ctbc', '中信'], industry: '金融/銀行', stats: { median: 1100000, avg: 1350000, count: 10000, year: 112 } },
+  { id: 'c15', name: 'Gogoro', aliases: ['睿能創意'], industry: '傳統製造', stats: { median: 900000, avg: 1050000, count: 2500, year: 112 } },
+  { id: 'c16', name: 'Nvidia', aliases: ['輝達', 'nv'], industry: '半導體/電子', stats: { median: 3500000, avg: 4500000, count: 1500, year: 112 } },
+  { id: 'c17', name: 'Microsoft', aliases: ['微軟'], industry: '軟體/網路', stats: { median: 2200000, avg: 2800000, count: 600, year: 112 } },
+  { id: 'c18', name: 'ByteDance', aliases: ['字節跳動', 'tiktok', '抖音'], industry: '軟體/網路', stats: { median: 2000000, avg: 2500000, count: 300, year: 112 } },
+];
+
+const generateDiscussionThreads = (companyName) => {
+  const threads = [
+    { id: 't1', user: 'TechGuy_99', type: '推', content: `${companyName} 的風氣真的不錯，WFH 很自由。`, time: '2小時前' },
+    { id: 't2', user: 'FreshMan', type: '→', content: '請問面試大概多久會收到通知？', time: '5小時前' },
+    { id: 't3', user: 'AngryBird', type: '噓', content: '年終今年砍很多，不要被騙了，塊陶阿！', time: '1天前' },
+    { id: 't4', user: 'HR_Helper', type: '推', content: '內部福利其實一直在增加，免費午餐回來了。', time: '2天前' },
+    { id: 't5', user: 'Observer', type: '→', content: '聽說部門之間風氣差很多，要看運氣。', time: '3天前' },
+  ];
+  return threads;
+};
+
+const generateMockData = (count = 50) => {
+  const companiesList = generateCompanies();
+  const titles = ['資深軟體工程師', '前端工程師', '後端工程師', '產品經理 (PM)', 'UI/UX 設計師', '行銷企劃', '資料科學家'];
+  const locations = ['台北市', '新竹縣市', '遠端 (Remote)'];
+  const mockContents = [
+    "年終獎金很敢給，但相對壓力也大，適合想拚高薪的人。",
+    "辦公室環境優美，有免費零食櫃和咖啡，WFH 政策很彈性。",
+    "部門氣氛很好，前輩都很願意教學，適合新鮮人練功。",
+    "常常需要跟國外團隊開會，英文能力要好，時差比較辛苦。",
+    "專案時程通常很趕，加班是常態，要有心理準備。",
+    "雖然底薪在業界不算頂尖，但生活品質 (WLB) 很好，準時上下班。",
+    "內部流程有點繁瑣，大公司的通病，但福利制度很完善。",
+    "同事技術都很強，Code Review 很嚴格，可以學到很多 best practice。",
+    "面試過程有三關，白板題要多刷，考驗演算法能力。",
+    "每季都有 Team Building，部門聚餐預算很高，吃得很好。",
+    "升遷制度透明，只要有戰功就有機會，不怕被埋沒。",
+    "使用的技術疊比較舊，維護 legacy code 比較痛苦。",
+    "雖然是傳產，但正在推動數位轉型，有很多發揮空間。",
+    "主管很有能力，跟著他可以學到很多專案管理技巧。"
+  ];
+  
+  const data = [];
+  for (let i = 0; i < count; i++) {
+    const comp = companiesList[Math.floor(Math.random() * companiesList.length)];
+    const baseSalary = 40000 + Math.floor(Math.random() * 160) * 1000;
+    data.push({
+      id: `mock-${i + 1}`,
+      company: comp.name, 
+      industry: comp.industry,
+      title: titles[Math.floor(Math.random() * titles.length)],
+      department: '研發部',
+      annual_package: `${Math.floor(baseSalary * 14 / 10000)}萬`,
+      salary: baseSalary.toString(),
+      currency: 'TWD', period: '月薪', experience: '3.0',
+      location: locations[Math.floor(Math.random() * locations.length)],
+      content: mockContents[Math.floor(Math.random() * mockContents.length)],
+      status: 'approved',
+      createdAt: { seconds: Date.now() / 1000 - Math.floor(Math.random() * 86400 * 30) },
+      interactions: [],
+      authorId: `mock-user-${i}`
+    });
+  }
+  return data.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
+};
+
+// --- Helper Components ---
+const NoteCard = ({ children, className = "", onClick }) => (
+  <div onClick={onClick} className={`bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden ${className}`}>
+    {children}
+  </div>
+);
+
+const Chip = ({ label, active, onClick, icon: Icon }) => (
+  <button 
+    onClick={onClick}
+    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border ${
+      active 
+        ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+    }`}
+  >
+    {Icon && <Icon size={14} />}
+    {label}
+  </button>
+);
+
+const Badge = ({ children, color = "blue" }) => {
+  const colors = {
+    blue: "bg-blue-50 text-blue-700 border-blue-100", 
+    green: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    gray: "bg-slate-100 text-slate-600 border-slate-200",
+  };
+  return <span className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${colors[color] || colors.blue}`}>{children}</span>;
+};
+
+// --- New Feature: Company Detail View & Cchat Thread ---
+const CompanyDetailView = ({ company, onBack, role }) => {
+  const [activeTab, setActiveTab] = useState('overview'); // overview, discussion
+  const [threads, setThreads] = useState(generateDiscussionThreads(company.name));
+  const [newComment, setNewComment] = useState('');
+  const [commentType, setCommentType] = useState('推');
+  
+  // Stats Editing State
+  const [isEditingStats, setIsEditingStats] = useState(false);
+  const [stats, setStats] = useState(company.stats || { median: 0, avg: 0, count: 0, year: 112 });
+
+  const handlePostComment = () => {
+    if(!newComment.trim()) return;
+    const newThread = {
+      id: `t-${Date.now()}`,
+      user: role === 'guest' ? 'Guest_User' : 'User_TW',
+      type: commentType,
+      content: newComment,
+      time: '剛剛'
+    };
+    setThreads([newThread, ...threads]);
+    setNewComment('');
+  };
+
+  const handleSaveStats = () => {
+    // In a real app, this would update Firebase
+    setIsEditingStats(false);
+  };
+
+  const formatCurrency = (val) => val ? parseInt(val).toLocaleString() : '-';
+
+  return (
+    <div className="flex flex-col h-full bg-slate-50 animate-in slide-in-from-right-4 fade-in duration-300">
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-4">
+          <button onClick={onBack} className="p-2 -ml-2 hover:bg-slate-100 rounded-full text-slate-500 transition-colors">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex items-center gap-3 flex-1">
+             <div className="w-10 h-10 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                {company.name.charAt(0)}
+             </div>
+             <div>
+                <h1 className="font-bold text-lg text-slate-900 leading-tight">{company.name}</h1>
+                <div className="text-xs text-slate-500 flex items-center gap-2">
+                   <Building2 size={12}/> {company.industry}
+                   {company.aliases && <span className="text-slate-300">|</span>}
+                   <span className="text-slate-400">{company.aliases?.[0]}</span>
+                </div>
+             </div>
+          </div>
+        </div>
+        
+        {/* Tabs */}
+        <div className="max-w-3xl mx-auto px-4 flex gap-6 text-sm font-medium">
+          <button 
+            onClick={() => setActiveTab('overview')}
+            className={`pb-3 border-b-2 transition-colors ${activeTab === 'overview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+          >
+            公司概況 & 薪資
+          </button>
+          <button 
+            onClick={() => setActiveTab('discussion')}
+            className={`pb-3 border-b-2 transition-colors ${activeTab === 'discussion' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
+          >
+            討論串 (Live)
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        <div className="max-w-3xl mx-auto space-y-6">
+          
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6 animate-in fade-in zoom-in-95">
+              {/* Government Stats Card */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                   <div className="flex items-center gap-2">
+                      <Landmark className="text-slate-400" size={18} />
+                      <h3 className="font-bold text-slate-700">主計處 / 公開資訊觀測站 申報資料</h3>
+                   </div>
+                   {!isEditingStats ? (
+                     <button onClick={() => setIsEditingStats(true)} className="text-xs flex items-center gap-1 text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded transition-colors font-medium">
+                       <Edit3 size={12} /> 編輯數據
+                     </button>
+                   ) : (
+                     <button onClick={handleSaveStats} className="text-xs flex items-center gap-1 text-emerald-600 hover:bg-emerald-50 px-2 py-1 rounded transition-colors font-medium">
+                       <Save size={12} /> 儲存變更
+                     </button>
+                   )}
+                </div>
+                
+                <div className="p-6">
+                   <div className="flex items-center justify-between mb-6">
+                      <div className="text-sm text-slate-500 font-medium">統計年度</div>
+                      {isEditingStats ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400 text-sm">民國</span>
+                          <input type="number" className="w-16 p-1 border rounded text-right" value={stats.year} onChange={e=>setStats({...stats, year: e.target.value})} />
+                          <span className="text-slate-400 text-sm">年</span>
+                        </div>
+                      ) : (
+                        <div className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">民國 {stats.year} 年</div>
+                      )}
+                   </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Non-Managerial Median */}
+                      <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100 relative group">
+                         <div className="text-xs text-indigo-600 font-bold mb-1 uppercase tracking-wider">非主管職務平均薪資</div>
+                         {isEditingStats ? (
+                           <input type="number" className="w-full bg-white p-2 border border-indigo-200 rounded text-lg font-bold" value={stats.avg} onChange={e=>setStats({...stats, avg: e.target.value})} />
+                         ) : (
+                           <div className="text-2xl font-black text-indigo-900 tracking-tight">${formatCurrency(stats.avg)}</div>
+                         )}
+                         <TrendingUp className="absolute right-4 bottom-4 text-indigo-200" size={24} />
+                      </div>
+
+                      {/* Median */}
+                      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-100 relative group">
+                         <div className="text-xs text-emerald-600 font-bold mb-1 uppercase tracking-wider">薪資中位數</div>
+                         {isEditingStats ? (
+                           <input type="number" className="w-full bg-white p-2 border border-emerald-200 rounded text-lg font-bold" value={stats.median} onChange={e=>setStats({...stats, median: e.target.value})} />
+                         ) : (
+                           <div className="text-2xl font-black text-emerald-900 tracking-tight">${formatCurrency(stats.median)}</div>
+                         )}
+                         <BarChart3 className="absolute right-4 bottom-4 text-emerald-200" size={24} />
+                      </div>
+
+                      {/* Employee Count */}
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 relative group">
+                         <div className="text-xs text-slate-500 font-bold mb-1 uppercase tracking-wider">員工人數</div>
+                         {isEditingStats ? (
+                           <input type="number" className="w-full bg-white p-2 border border-slate-200 rounded text-lg font-bold" value={stats.count} onChange={e=>setStats({...stats, count: e.target.value})} />
+                         ) : (
+                           <div className="text-2xl font-black text-slate-700 tracking-tight">{formatCurrency(stats.count)} <span className="text-sm font-normal text-slate-400">人</span></div>
+                         )}
+                         <Users className="absolute right-4 bottom-4 text-slate-200" size={24} />
+                      </div>
+                   </div>
+                   <div className="mt-4 text-[10px] text-slate-400 text-center">
+                      * 資料來源：公開資訊觀測站 / 行政院主計總處。本平台數據僅供參考。
+                   </div>
+                </div>
+              </div>
+
+              {/* Recruitment / Quick Actions Placeholder */}
+              <div className="grid grid-cols-2 gap-4">
+                 <button className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all text-left group">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><Briefcase size={16}/></div>
+                    <div className="font-bold text-slate-700">查看職缺</div>
+                    <div className="text-xs text-slate-400">前往求職網站</div>
+                 </button>
+                 <button className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all text-left group">
+                    <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"><AlertTriangle size={16}/></div>
+                    <div className="font-bold text-slate-700">回報資訊錯誤</div>
+                    <div className="text-xs text-slate-400">協助修正數據</div>
+                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Discussion Tab (Cchat Style) */}
+          {activeTab === 'discussion' && (
+            <div className="bg-black/90 rounded-2xl overflow-hidden shadow-2xl min-h-[500px] flex flex-col animate-in fade-in zoom-in-95 font-mono">
+               {/* Terminal Header */}
+               <div className="bg-slate-800 px-4 py-2 flex items-center justify-between border-b border-slate-700">
+                  <div className="text-emerald-400 text-xs flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    bbs://salary-notebook/{company.id}
+                  </div>
+                  <div className="text-slate-500 text-xs">UTF-8</div>
+               </div>
+
+               {/* Thread List */}
+               <div className="flex-1 p-4 space-y-3 overflow-y-auto">
+                  {threads.length === 0 && <div className="text-slate-500 text-center py-10">尚無討論...</div>}
+                  {threads.map((t) => (
+                    <div key={t.id} className="flex gap-3 text-sm group">
+                       <div className={`shrink-0 font-bold ${
+                         t.type === '推' ? 'text-emerald-400' : 
+                         t.type === '噓' ? 'text-red-500' : 'text-yellow-400'
+                       }`}>
+                         {t.type}
+                       </div>
+                       <div className="flex-1 text-slate-300 break-all">
+                          <span className="text-slate-500 mr-2">{t.user}:</span>
+                          {t.content}
+                          <span className="text-slate-600 text-xs ml-2 opacity-50 group-hover:opacity-100">{t.time}</span>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+
+               {/* Input Area */}
+               <div className="p-3 bg-slate-800 border-t border-slate-700">
+                  <div className="flex gap-2 mb-2">
+                     {['推', '→', '噓'].map(type => (
+                       <button 
+                         key={type}
+                         onClick={() => setCommentType(type)}
+                         className={`px-3 py-1 rounded text-xs font-bold transition-colors ${
+                           commentType === type 
+                             ? (type==='推'?'bg-emerald-600 text-white':type==='噓'?'bg-red-600 text-white':'bg-yellow-600 text-white') 
+                             : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                         }`}
+                       >
+                         {type}
+                       </button>
+                     ))}
+                  </div>
+                  <div className="flex gap-2">
+                     <input 
+                       className="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-slate-200 text-sm outline-none focus:border-slate-500 placeholder:text-slate-600"
+                       placeholder="輸入討論內容..."
+                       value={newComment}
+                       onChange={e => setNewComment(e.target.value)}
+                       onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+                     />
+                     <button 
+                       onClick={handlePostComment}
+                       className="px-4 py-2 bg-slate-700 text-slate-200 rounded hover:bg-slate-600 text-sm font-bold"
+                     >
+                       送出
+                     </button>
+                  </div>
+               </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- 1. Company Autocomplete Component ---
+const CompanyAutocomplete = ({ value, onChange, onSelect, companies, onCreateNew }) => {
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleInput = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    
+    if (!val.trim()) {
+      setSuggestions([]);
+      return;
+    }
+
+    const lowerVal = val.toLowerCase();
+    const filtered = companies.filter(c => 
+      c.name.toLowerCase().includes(lowerVal) || 
+      (c.aliases && c.aliases.some(alias => alias.toLowerCase().includes(lowerVal)))
+    );
+    setSuggestions(filtered);
+    setShowSuggestions(true);
+  };
+
+  const handleSelect = (company) => {
+    onChange(company.name);
+    if (onSelect) onSelect(company);
+    setShowSuggestions(false);
+  };
+
+  return (
+    <div className="relative" ref={wrapperRef}>
+      <div className="relative">
+        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+        <input 
+          required
+          type="text" 
+          className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+          value={value} 
+          onChange={handleInput}
+          onFocus={() => { if(value) setShowSuggestions(true); }}
+          placeholder="公司名稱 (如: Google...)" 
+          autoComplete="off"
+        />
+      </div>
+      
+      {showSuggestions && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+          {suggestions.length > 0 ? (
+            suggestions.map(c => (
+              <div 
+                key={c.id} 
+                onClick={() => handleSelect(c)}
+                className="px-4 py-3 hover:bg-slate-50 cursor-pointer border-b border-slate-50 last:border-0 flex items-center justify-between group"
+              >
+                <div>
+                  <div className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">{c.name}</div>
+                  <div className="text-xs text-slate-400">{c.industry}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="px-4 py-3 text-sm text-slate-500 text-center">找不到 "{value}"</div>
+          )}
+          <div 
+            onClick={() => { setShowSuggestions(false); onCreateNew(value); }}
+            className="px-4 py-3 bg-indigo-50 hover:bg-indigo-100 cursor-pointer text-indigo-700 font-bold text-sm sticky bottom-0 text-center"
+          >
+            + 建立 "{value}"
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- 2. Interaction Section (Fixed Evaluation Logic) ---
+const InteractionSection = ({ entry, currentUserId, onInteract, onDelete, onLoginRequire }) => {
+    const [comment, setComment] = useState('');
+    const [activeAction, setActiveAction] = useState(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const interactions = entry.interactions || [];
+    const myInteraction = currentUserId ? interactions.find(i => i.userId === currentUserId) : null;
+    
+    useEffect(() => { 
+      if (isEditing && myInteraction) { 
+        setComment(myInteraction.comment); 
+        setActiveAction(myInteraction.type); 
+      } 
+    }, [isEditing, myInteraction]);
+
+    const handleSend = () => {
+        if (!comment.trim()) return;
+        onInteract(entry.id, activeAction, comment);
+        setComment('');
+        setActiveAction(null);
+        setIsEditing(false);
+    };
+
+    return (
+        <div className="mt-4 pt-3 border-t border-slate-100">
+            {/* Stats Header */}
+            <div className="flex items-center justify-between mb-3 text-slate-500">
+                 <div className="flex gap-4 text-xs font-medium">
+                    <span className="flex items-center gap-1"><ThumbsUp size={14}/> {interactions.filter(i=>i.type==='like').length}</span>
+                    <span className="flex items-center gap-1"><ThumbsDown size={14}/> {interactions.filter(i=>i.type==='dislike').length}</span>
+                 </div>
+                 {/* Only show 'My Review' label if user has reviewed */}
+                 {myInteraction && !isEditing && <span className="text-xs bg-slate-100 px-2 py-0.5 rounded text-slate-600">已評價</span>}
+            </div>
+
+            {myInteraction && !isEditing ? (
+                <div className="bg-slate-50 p-3 rounded-lg flex justify-between items-start group">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${myInteraction.type === 'like' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                {myInteraction.type === 'like' ? '推薦' : '反推'}
+                            </span>
+                            <span className="text-xs text-slate-400">我</span>
+                        </div>
+                        <p className="text-sm text-slate-700 break-all">{myInteraction.comment}</p>
+                    </div>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={()=>setIsEditing(true)} className="p-1 text-slate-400 hover:text-indigo-600"><Edit3 size={14}/></button>
+                        <button onClick={()=>onDelete(entry.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14}/></button>
+                    </div>
+                </div>
+            ) : (
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
+                    <div className="flex gap-2">
+                         <button 
+                            onClick={()=>{ if(!currentUserId)return onLoginRequire(); setActiveAction('like'); }} 
+                            className={`flex-1 py-2 flex items-center justify-center gap-2 text-sm rounded-lg border transition-all ${activeAction==='like'?'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500':'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                        >
+                            <ThumbsUp size={16} className={activeAction==='like'?'fill-current':''}/> 值得推薦
+                        </button>
+                        <button 
+                            onClick={()=>{ if(!currentUserId)return onLoginRequire(); setActiveAction('dislike'); }} 
+                            className={`flex-1 py-2 flex items-center justify-center gap-2 text-sm rounded-lg border transition-all ${activeAction==='dislike'?'bg-rose-50 border-rose-500 text-rose-700 ring-1 ring-rose-500':'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                        >
+                            <ThumbsDown size={16} className={activeAction==='dislike'?'fill-current':''}/> 考慮一下
+                        </button>
+                    </div>
+                    
+                    {activeAction && (
+                        <div className="flex gap-2">
+                            <input 
+                                className="flex-1 text-sm p-2.5 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" 
+                                value={comment} 
+                                onChange={e=>setComment(e.target.value)} 
+                                placeholder={activeAction === 'like' ? "分享這間公司的優點..." : "分享需要注意的地方..."}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            />
+                            <button 
+                                onClick={handleSend} 
+                                disabled={!comment.trim()}
+                                className="px-4 bg-indigo-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-indigo-700 transition-colors"
+                            >
+                                <Send size={16}/>
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- Modals (Moved Up to prevent Hoisting Issues) ---
+
+const CreateCompanyModal = ({ initialName, onClose, onSubmit }) => {
+  const [form, setForm] = useState({ name: initialName || '', industry: '軟體/網路', aliases: '' });
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const aliasesArray = form.aliases.split(',').map(s => s.trim()).filter(Boolean);
+    if (form.name && !aliasesArray.includes(form.name.toLowerCase())) aliasesArray.push(form.name.toLowerCase());
+    onSubmit({ ...form, aliases: aliasesArray });
+  };
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <h3 className="text-xl font-bold mb-4">新增公司</h3>
+        <form onSubmit={handleSubmit} className="space-y-4">
+           <input className="w-full p-3 border rounded-xl" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="公司名稱" autoFocus required/>
+           <select className="w-full p-3 border rounded-xl bg-white" value={form.industry} onChange={e=>setForm({...form,industry:e.target.value})}>
+              <option>軟體/網路</option><option>半導體/電子</option><option>金融/銀行</option><option>電商/零售</option><option>傳統製造</option>
+           </select>
+           <div className="flex gap-3 mt-4">
+              <button type="button" onClick={onClose} className="flex-1 py-3 text-slate-500 font-bold">取消</button>
+              <button type="submit" className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-bold">建立</button>
+           </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const LoginModal = ({ onClose }) => (
+  <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white p-8 rounded-3xl max-w-sm w-full shadow-2xl text-center">
+        <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6 text-indigo-600">
+            <User size={32} />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900 mb-2">請先登入</h3>
+        <p className="text-slate-500 mb-8">此功能需要會員權限，請切換身份後繼續。</p>
+        <button onClick={onClose} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold">我知道了</button>
+    </div>
+  </div>
+);
+
+// --- Main App ---
+
+export default function App() {
+  // State
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState([]); 
+  const [filteredEntries, setFilteredEntries] = useState([]); 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showToast, setShowToast] = useState({ show: false, message: '', type: 'success' });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false); // Toggle for advanced filters
+  
+  // Navigation State
+  const [activeView, setActiveView] = useState('home'); // home, settings, company-detail
+  const [viewingCompany, setViewingCompany] = useState(null); // stores the company object being viewed
+
+  // Modals & Navigation
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showCreateCompanyModal, setShowCreateCompanyModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('home'); // home, settings (for Mobile Nav)
+  
+  // Data
+  const [companies, setCompanies] = useState(generateCompanies());
+  const [mockDB, setMockDB] = useState(generateMockData(50));
+  const [newCompanyInitialName, setNewCompanyInitialName] = useState('');
+  
+  // Filter State
+  const [filters, setFilters] = useState({ 
+    industry: 'all', 
+    selectedCompany: null,
+    title: '', // New
+    minSalary: '', // New
+    minExperience: '' // New
+  });
+  const [currentRole, setCurrentRole] = useState('guest'); 
+  const [appSettings, setAppSettings] = useState({ useMockData: true }); // Default to Mock for stability
+
+  // Form State
+  const [formData, setFormData] = useState({
+    company: '', title: '', industry: '軟體/網路', department: '', annual_package: '', salary: '', 
+    currency: 'TWD', period: '月薪', experience: '', location: '台北市', content: ''
+  });
+  const [submitLoading, setSubmitLoading] = useState(false);
+
+  // --- Auth & Init ---
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch(e) { console.error("Auth init error:", e); }
+    };
+    initAuth();
+    return onAuthStateChanged(auth, setUser);
+  }, []);
+
+  // --- Data Fetching ---
+  useEffect(() => {
+    setLoading(true);
+    if (appSettings.useMockData) {
+      // Mock Data Mode
+      setEntries([...mockDB]);
+      setLoading(false);
+    } else {
+      // Firebase Mode
+      if (!user) { setLoading(false); return; }
+      const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'salary_entries'), orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setEntries(data);
+        setLoading(false);
+      }, (error) => {
+        console.error("Firebase Error:", error);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [user, appSettings.useMockData, mockDB]);
+
+  // --- Filtering Logic ---
+  useEffect(() => {
+    let result = [...entries];
+    
+    // Status Filter
+    if (currentRole === 'guest' || currentRole === 'user') {
+        result = result.filter(item => item.status === 'approved');
+    }
+
+    // Search Filter
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(e => 
+        e.company.toLowerCase().includes(lower) || 
+        e.title.toLowerCase().includes(lower) ||
+        (e.content && e.content.toLowerCase().includes(lower))
+      );
+    }
+
+    // Industry Filter
+    if (filters.industry !== 'all') {
+        result = result.filter(e => e.industry === filters.industry);
+    }
+
+    // Company Selection
+    if (filters.selectedCompany) {
+        result = result.filter(e => e.company === filters.selectedCompany);
+    }
+
+    // Advanced Filters
+    if (filters.title) {
+      result = result.filter(e => e.title.toLowerCase().includes(filters.title.toLowerCase()));
+    }
+    if (filters.minSalary) {
+      result = result.filter(e => parseInt(e.salary || 0) >= parseInt(filters.minSalary));
+    }
+    if (filters.minExperience) {
+      result = result.filter(e => parseFloat(e.experience || 0) >= parseFloat(filters.minExperience));
+    }
+
+    setFilteredEntries(result);
+  }, [entries, searchTerm, filters, currentRole]);
+
+  // --- Navigation Handlers ---
+  const handleCompanyClick = (companyName) => {
+    const company = companies.find(c => c.name === companyName) || { name: companyName, industry: '未知', aliases: [], stats: { median: 0, avg: 0, count: 0, year: 112 } };
+    setViewingCompany(company);
+    setActiveView('company-detail');
+  };
+
+  const handleBackToHome = () => {
+    setViewingCompany(null);
+    setActiveView('home');
+  };
+
+  // --- API Actions ---
+  const showNotification = (message, type) => {
+    setShowToast({ show: true, message, type });
+    setTimeout(() => setShowToast({ show: false, message: '', type: 'success' }), 3000);
+  };
+
+  const requireLogin = useCallback(() => {
+    if (currentRole === 'guest') { setShowLoginModal(true); return true; }
+    return false;
+  }, [currentRole]);
+
+  const api = useMemo(() => ({
+    // Add Entry
+    add: async (data) => {
+      const uid = appSettings.useMockData ? `mock-${currentRole}` : user?.uid;
+      const newEntry = { ...data, createdAt: serverTimestamp(), interactions: [], authorId: uid, status: 'approved' }; // Direct approve for demo
+      
+      if (appSettings.useMockData) {
+        const mockEntry = { ...newEntry, id: `mock-${Date.now()}`, createdAt: { seconds: Date.now()/1000 } };
+        setMockDB(prev => [mockEntry, ...prev]);
+      } else {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'salary_entries'), newEntry);
+      }
+    },
+    
+    // Add Company
+    addCompany: async (companyData) => {
+      const newComp = { ...companyData, id: `comp-${Date.now()}` };
+      setCompanies(prev => [...prev, newComp]);
+      if (!appSettings.useMockData) {
+         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'companies'), companyData);
+      }
+    },
+
+    // *** FIX: Interaction Logic ***
+    interact: async (id, actionType, comment) => {
+        const uid = appSettings.useMockData ? `mock-${currentRole}` : user?.uid;
+        if (!uid) return;
+
+        const newInteraction = actionType ? {
+            userId: uid,
+            type: actionType,
+            comment: comment,
+            createdAt: new Date().toISOString()
+        } : null; // null implies deletion
+
+        if (appSettings.useMockData) {
+            setMockDB(prev => prev.map(entry => {
+                if (entry.id !== id) return entry;
+                
+                let interactions = [...(entry.interactions || [])];
+                const existingIndex = interactions.findIndex(i => i.userId === uid);
+
+                if (newInteraction === null) {
+                    // Delete
+                    if (existingIndex > -1) interactions.splice(existingIndex, 1);
+                } else {
+                    // Add or Update
+                    if (existingIndex > -1) {
+                        interactions[existingIndex] = newInteraction;
+                    } else {
+                        interactions.push(newInteraction);
+                    }
+                }
+                return { ...entry, interactions };
+            }));
+        } else {
+            // Firebase Transaction
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'salary_entries', id);
+            try {
+                await runTransaction(db, async (transaction) => {
+                    const sfDoc = await transaction.get(docRef);
+                    if (!sfDoc.exists()) return;
+                    
+                    const entry = sfDoc.data();
+                    let interactions = entry.interactions || [];
+                    const existingIndex = interactions.findIndex(i => i.userId === uid);
+
+                    if (newInteraction === null) {
+                        if (existingIndex > -1) interactions.splice(existingIndex, 1);
+                    } else {
+                        if (existingIndex > -1) {
+                            interactions[existingIndex] = newInteraction;
+                        } else {
+                            interactions.push(newInteraction);
+                        }
+                    }
+                    transaction.update(docRef, { interactions });
+                });
+            } catch (e) {
+                console.error("Interaction Failed", e);
+                showNotification("操作失敗，請重試", "error");
+            }
+        }
+    }
+  }), [appSettings.useMockData, currentRole, user]);
+
+  // --- Handlers ---
+  const handleCompanyCreate = async (newCompanyData) => {
+    await api.addCompany(newCompanyData);
+    setFormData(p => ({ ...p, company: newCompanyData.name, industry: newCompanyData.industry }));
+    setShowCreateCompanyModal(false);
+    showNotification(`已建立公司：${newCompanyData.name}`, 'success');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSubmitLoading(true);
+    await api.add(formData);
+    setSubmitLoading(false);
+    setShowSubmitModal(false);
+    showNotification('提交成功！', 'success');
+    // Reset form
+    setFormData({ company: '', title: '', industry: '軟體/網路', department: '', annual_package: '', salary: '', currency: 'TWD', period: '月薪', experience: '', location: '台北市', content: '' });
+  };
+
+  // --- Layout Components ---
+
+  // Sidebar (NotebookLM "Sources" Panel)
+  const Sidebar = () => (
+    <div className="w-72 flex-shrink-0 bg-[#F9FAFB] border-r border-slate-200 flex flex-col h-full hidden md:flex">
+      <div className="p-4 border-b border-slate-200 flex items-center gap-2 flex-shrink-0">
+        <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold shadow-sm">
+          <Sparkles size={16} />
+        </div>
+        <h1 className="font-semibold text-slate-800 tracking-tight">Salary Notebook</h1>
+      </div>
+
+      <div className="p-4 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        {/* Actions */}
+        <button 
+          onClick={() => !requireLogin() && setShowSubmitModal(true)}
+          className="w-full flex items-center gap-2 bg-white border border-slate-200 p-3 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition-all text-slate-700 font-medium group"
+        >
+          <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-100 group-hover:scale-110 transition-transform">
+             <Plus size={18} />
+          </div>
+           新增薪資情報
+        </button>
+
+        {/* Filters / Sources */}
+        <div>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">資料來源 (公司)</h3>
+          <div className="space-y-1">
+            <button 
+              onClick={() => { setFilters({ ...filters, selectedCompany: null }); handleBackToHome(); }}
+              className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${!filters.selectedCompany && activeView === 'home' ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              <Layout size={16} />
+              全部情報
+            </button>
+            {companies.map(c => (
+              <button 
+                key={c.id}
+                onClick={() => handleCompanyClick(c.name)}
+                className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${viewingCompany?.name === c.name && activeView === 'company-detail' ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
+              >
+                <div className="w-4 h-4 rounded bg-slate-200 flex items-center justify-center text-[8px] text-slate-500 font-bold flex-shrink-0">
+                    {c.name.charAt(0)}
+                </div>
+                <span className="truncate">{c.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Fixed Bottom Section */}
+      <div className="p-4 border-t border-slate-200 bg-slate-50 flex-shrink-0">
+         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">設定</h3>
+         <div className="space-y-1">
+           <button onClick={() => setShowSettingsModal(true)} className="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+             <Settings size={16} /> 系統管理
+           </button>
+           <button onClick={()=>{
+               const roles = ['guest', 'user', 'admin'];
+               const next = roles[(roles.indexOf(currentRole) + 1) % roles.length];
+               setCurrentRole(next);
+           }} className="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 text-slate-600 hover:bg-slate-100">
+             <User size={16} /> 切換身份: {currentRole}
+           </button>
+         </div>
+      </div>
+    </div>
+  );
+
+  // Bottom Nav (Mobile PWA)
+  const BottomNav = () => (
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 h-16 flex items-center justify-around z-40 pb-safe">
+       <button onClick={() => { setActiveTab('home'); setFilters({...filters, selectedCompany: null}); handleBackToHome(); }} className={`flex flex-col items-center gap-1 ${activeTab==='home'?'text-indigo-600':'text-slate-400'}`}>
+         <Home size={24} />
+         <span className="text-[10px] font-medium">首頁</span>
+       </button>
+       <button onClick={() => !requireLogin() && setShowSubmitModal(true)} className="flex flex-col items-center gap-1 text-slate-400">
+         <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-lg -mt-5 border-4 border-slate-50">
+           <Plus size={24} />
+         </div>
+         <span className="text-[10px] font-medium">新增</span>
+       </button>
+       <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 ${activeTab==='settings'?'text-indigo-600':'text-slate-400'}`}>
+         <Settings size={24} />
+         <span className="text-[10px] font-medium">設定</span>
+       </button>
+    </div>
+  );
+
+  return (
+    <div className="flex h-screen bg-white text-slate-900 font-sans overflow-hidden">
+      <Sidebar />
+      
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-full relative">
+        {/* Mobile Header */}
+        <div className="md:hidden h-14 border-b border-slate-100 flex items-center justify-between px-4 bg-white z-20">
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+                <Sparkles size={18} className="text-indigo-600"/> Salary Notebook
+            </div>
+            <div className="text-xs px-2 py-1 bg-slate-100 rounded-full text-slate-500">{currentRole}</div>
+        </div>
+
+        {/* Content Feed or Detailed View */}
+        {activeView === 'company-detail' && viewingCompany ? (
+          <CompanyDetailView company={viewingCompany} onBack={handleBackToHome} role={currentRole} />
+        ) : (
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar pb-24 md:pb-4">
+            <div className="max-w-3xl mx-auto space-y-6">
+              
+              {/* Search / Context Bar with Advanced Filters */}
+              <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
+                 <div className="flex gap-2 mb-2">
+                   <div className="relative group flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                      <input 
+                        className="w-full pl-10 pr-4 py-3 md:py-4 bg-slate-100 md:bg-white border-none md:border md:border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-100 focus:bg-white transition-all shadow-sm text-base"
+                        placeholder={filters.selectedCompany ? `搜尋 ${filters.selectedCompany} 的內容...` : "搜尋公司、職稱或關鍵字..."}
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                      />
+                      {filters.selectedCompany && (
+                        <button onClick={()=>setFilters({...filters, selectedCompany: null})} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-full">
+                          <XCircle size={16} className="text-slate-400"/>
+                        </button>
+                      )}
+                   </div>
+                   <button 
+                      onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                      className={`px-4 rounded-xl border transition-all flex items-center gap-2 font-medium ${showAdvancedFilters ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                   >
+                      <SlidersHorizontal size={18} />
+                      <span className="hidden md:inline">篩選</span>
+                   </button>
+                 </div>
+
+                 {/* Advanced Filters Panel */}
+                 {showAdvancedFilters && (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm animate-in slide-in-from-top-2 fade-in">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Building2 size={12}/> 公司</label>
+                                <select 
+                                  className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                                  value={filters.selectedCompany || ''}
+                                  onChange={e => setFilters({...filters, selectedCompany: e.target.value || null})}
+                                >
+                                    <option value="">全部公司</option>
+                                    {companies.map(c => (
+                                        <option key={c.id} value={c.name}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Briefcase size={12}/> 職稱關鍵字</label>
+                                <input 
+                                    className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="例如: 前端"
+                                    value={filters.title}
+                                    onChange={e => setFilters({...filters, title: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><DollarSign size={12}/> 最低月薪</label>
+                                <input 
+                                    type="number"
+                                    className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="例如: 40000"
+                                    value={filters.minSalary}
+                                    onChange={e => setFilters({...filters, minSalary: e.target.value})}
+                                />
+                            </div>
+                             <div className="space-y-1.5">
+                                <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1"><Clock size={12}/> 最低年資 (年)</label>
+                                <input 
+                                    type="number"
+                                    className="w-full p-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="例如: 3"
+                                    value={filters.minExperience}
+                                    onChange={e => setFilters({...filters, minExperience: e.target.value})}
+                                />
+                            </div>
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
+                            <button 
+                               onClick={() => setFilters({ industry: 'all', selectedCompany: null, title: '', minSalary: '', minExperience: '' })}
+                               className="text-xs text-slate-400 hover:text-rose-500 font-medium"
+                            >
+                                重置所有條件
+                            </button>
+                        </div>
+                    </div>
+                 )}
+              </div>
+
+              {/* Empty State */}
+              {filteredEntries.length === 0 && !loading && (
+                <div className="text-center py-20">
+                  <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-300">
+                     <FileText size={32} />
+                  </div>
+                  <h3 className="text-slate-500 font-medium">沒有找到相關筆記</h3>
+                  <p className="text-sm text-slate-400 mt-1">試試看其他關鍵字或切換來源</p>
+                  <button onClick={() => setFilters({ industry: 'all', selectedCompany: null, title: '', minSalary: '', minExperience: '' })} className="mt-4 px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-200">清除篩選</button>
+                </div>
+              )}
+
+              {/* Cards Grid */}
+              <div className="grid gap-4">
+                {activeTab === 'home' ? filteredEntries.map(entry => (
+                  <NoteCard key={entry.id} onClick={() => handleCompanyClick(entry.company)} className="p-5 md:p-6 group">
+                     <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 font-bold text-lg group-hover:scale-110 transition-transform">
+                              {entry.company.charAt(0)}
+                            </div>
+                            <div>
+                               <h3 className="font-bold text-lg text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">{entry.company}</h3>
+                               <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                                 <span>{entry.title}</span>
+                                 <span>•</span>
+                                 <span>{entry.location}</span>
+                               </div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-xl font-bold text-emerald-600 font-mono tracking-tight">
+                               {currentRole === 'guest' ? '****' : parseInt(entry.salary).toLocaleString()}
+                               <span className="text-xs text-slate-400 font-sans font-normal ml-1">/月</span>
+                            </div>
+                            <div className="text-xs text-slate-400 mt-1">年資 {entry.experience} 年</div>
+                        </div>
+                     </div>
+                     
+                     {/* Content Block (NotebookLM style highlight) */}
+                     <div className="relative pl-4 border-l-2 border-indigo-100 py-1 my-4">
+                        <p className="text-slate-700 leading-relaxed text-sm md:text-base line-clamp-2">
+                            {entry.content}
+                        </p>
+                     </div>
+                     
+                     <div className="flex items-center gap-2 mt-4">
+                        <Badge color="gray">{entry.industry}</Badge>
+                        <Badge color="blue">{entry.annual_package}</Badge>
+                     </div>
+
+                     {/* Interaction Section */}
+                     <InteractionSection 
+                        entry={entry} 
+                        currentUserId={appSettings.useMockData ? `mock-${currentRole}` : user?.uid} 
+                        onInteract={api.interact}
+                        onDelete={(id) => api.interact(id, null, null)}
+                        onLoginRequire={() => setShowLoginModal(true)}
+                     />
+                  </NoteCard>
+                )) : (
+                   // Mobile Settings View
+                   <div className="bg-white p-6 rounded-xl border border-slate-200">
+                      <h2 className="text-xl font-bold mb-4">設定</h2>
+                      <div className="flex items-center justify-between py-3 border-b border-slate-100">
+                          <span>資料來源</span>
+                          <button onClick={() => setAppSettings(s => ({...s, useMockData: !s.useMockData}))} className={`px-3 py-1 rounded-full text-xs font-bold ${appSettings.useMockData ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                              {appSettings.useMockData ? '模擬資料' : 'Firebase'}
+                          </button>
+                      </div>
+                       <div className="flex items-center justify-between py-3 border-b border-slate-100">
+                          <span>目前身份</span>
+                          <span className="text-sm text-slate-500">{currentRole}</span>
+                      </div>
+                   </div>
+                )}
+              </div>
+              
+              {loading && (
+                  <div className="flex justify-center py-10">
+                      <Loader2 className="animate-spin text-indigo-500" />
+                  </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <BottomNav />
+      </div>
+
+      {/* --- Modals (Overlay Style for PWA feel) --- */}
+      
+      {/* Submit Modal */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 bg-white md:bg-black/50 md:backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4 animate-in slide-in-from-bottom-10 fade-in">
+           <div className="bg-white w-full md:max-w-lg md:rounded-2xl h-[95vh] md:h-auto flex flex-col shadow-2xl">
+              <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                 <h2 className="text-lg font-bold flex items-center gap-2"><PenLine size={18}/> 新增筆記</h2>
+                 <button onClick={()=>setShowSubmitModal(false)} className="p-2 hover:bg-slate-100 rounded-full"><XCircle size={20} className="text-slate-400"/></button>
+              </div>
+              <div className="p-6 overflow-y-auto flex-1">
+                 <form onSubmit={handleSubmit} className="space-y-5">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Company</label>
+                        <CompanyAutocomplete 
+                          value={formData.company}
+                          onChange={(val) => setFormData({...formData, company: val})}
+                          onSelect={(comp) => setFormData({...formData, company: comp.name, industry: comp.industry})}
+                          companies={companies}
+                          onCreateNew={(name) => {
+                             setNewCompanyInitialName(name);
+                             setShowCreateCompanyModal(true);
+                          }}
+                        />
+                    </div>
+                    {/* MODIFICATION: Restructured grid to include Annual Package */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Title</label>
+                           <input required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.title} onChange={e=>setFormData({...formData, title:e.target.value})} placeholder="例如: 前端工程師" />
+                        </div>
+                        <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Years of Exp</label>
+                           <input required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.experience} onChange={e=>setFormData({...formData, experience:e.target.value})} placeholder="3.5" />
+                        </div>
+                    </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Monthly Pay</label>
+                           <input required type="number" className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.salary} onChange={e=>setFormData({...formData, salary:e.target.value})} placeholder="45000" />
+                        </div>
+                        <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Annual Package</label>
+                           <input required className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500" value={formData.annual_package} onChange={e=>setFormData({...formData, annual_package:e.target.value})} placeholder="例如: 100萬" />
+                        </div>
+                    </div>
+                     <div>
+                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Location</label>
+                           <select className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none" value={formData.location} onChange={e=>setFormData({...formData, location:e.target.value})}>
+                               <option>台北市</option><option>新北市</option><option>新竹縣市</option><option>台中市</option><option>高雄市</option><option>遠端 (Remote)</option>
+                           </select>
+                    </div>
+                    {/* END MODIFICATION */}
+                     <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase">Notes / Review</label>
+                        <textarea className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500 h-32 resize-none" placeholder="分享一些工作心得、面試過程或公司文化..." value={formData.content} onChange={e=>setFormData({...formData, content:e.target.value})} />
+                    </div>
+                 </form>
+              </div>
+              <div className="p-4 border-t border-slate-100 bg-slate-50 md:rounded-b-2xl flex gap-3">
+                 <button onClick={()=>setShowSubmitModal(false)} className="flex-1 py-3 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-colors">取消</button>
+                 <button onClick={handleSubmit} disabled={submitLoading} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:opacity-50">
+                     {submitLoading ? <Loader2 className="animate-spin mx-auto"/> : '確認發布'}
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Settings Modal (Desktop) */}
+      {showSettingsModal && (
+          <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
+                  <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                      <h3 className="font-bold text-slate-700">系統設定</h3>
+                      <button onClick={()=>setShowSettingsModal(false)}><XCircle size={20} className="text-slate-400"/></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
+                          <div className="flex flex-col">
+                              <span className="font-bold text-slate-700 text-sm">資料來源模式</span>
+                              <span className="text-xs text-slate-400">目前: {appSettings.useMockData ? '模擬資料' : 'Firebase API'}</span>
+                          </div>
+                          <button 
+                            onClick={() => setAppSettings(s => ({...s, useMockData: !s.useMockData}))}
+                            className={`relative w-12 h-6 rounded-full transition-colors duration-200 ease-in-out ${appSettings.useMockData ? 'bg-amber-400' : 'bg-indigo-600'}`}
+                          >
+                              <div className={`absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform duration-200 ${appSettings.useMockData ? 'translate-x-0' : 'translate-x-6'}`} />
+                          </button>
+                      </div>
+                      <div className="text-xs text-center text-slate-400 mt-4">
+                          App ID: {appId} <br/>
+                          Version: 11.0 (Notebook Style)
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Utility Modals */}
+      {showCreateCompanyModal && <CreateCompanyModal initialName={newCompanyInitialName} onClose={() => setShowCreateCompanyModal(false)} onSubmit={handleCompanyCreate} />}
+      {showLoginModal && <LoginModal onClose={() => setShowLoginModal(false)} />}
+      
+      {/* Toast */}
+      {showToast.show && (
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-xl z-[100] animate-in fade-in slide-in-from-top-5 flex items-center gap-2">
+              <CheckCircle size={16} className="text-emerald-400" />
+              <span className="text-sm font-medium">{showToast.message}</span>
+          </div>
+      )}
+    </div>
+  );
+}
