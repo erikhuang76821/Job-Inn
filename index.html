@@ -3,19 +3,31 @@
 
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="Salary Notebook — 台灣職場薪資分享平台，匿名分享薪資情報與公司評價。" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/svg+xml" href="/Job-Inn/favicon.svg" />
   <title>Salary Notebook — Job-Inn</title>
+  <link rel="manifest" href="/Job-Inn/manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
     rel="stylesheet" />
-  <script type="module" crossorigin src="/Job-Inn/assets/index-Bx7ucmIi.js"></script>
-  <link rel="stylesheet" crossorigin href="/Job-Inn/assets/index-BvRyg7SW.css">
+  <script type="module" crossorigin src="/Job-Inn/assets/index-MSXHKDwj.js"></script>
+  <link rel="stylesheet" crossorigin href="/Job-Inn/assets/index-B7JeY6vZ.css">
 </head>
 
 <body>
   <div id="root"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => { });
+      });
+    }
+  </script>
 </body>
 
 </html>
