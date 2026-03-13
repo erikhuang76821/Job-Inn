@@ -1,10 +1,10 @@
 import React from 'react';
-import { Sparkles, Plus, Layout, Settings, LogIn, LogOut, Shield, User, MessageCircle } from 'lucide-react';
+import { Sparkles, Plus, Layout, Settings, LogIn, LogOut, Shield, User, MessageCircle, Gift } from 'lucide-react';
 
 const Sidebar = ({
     companies, filters, setFilters, activeView, activeTab, viewingCompany,
     currentRole, user, onCompanyClick, onBackToHome, requireLogin,
-    onShowSubmitModal, onShowSettingsModal, onLogin, onLogout, onSetActiveTab
+    onShowSubmitModal, onShowSettingsModal, onShowLottery, onLogin, onLogout, onSetActiveTab
 }) => (
     <div className="w-72 flex-shrink-0 bg-[#F9FAFB] border-r border-slate-200 flex flex-col h-full hidden md:flex">
         <div className="p-4 border-b border-slate-200 flex items-center gap-2 flex-shrink-0">
@@ -32,11 +32,16 @@ const Sidebar = ({
                 <div className="space-y-1">
                     <button
                         onClick={() => { onSetActiveTab('home'); onBackToHome(); }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${activeTab === 'home' && activeView !== 'company-detail' ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${activeTab === 'home' && activeView !== 'company-detail' && activeView !== 'lottery' ? 'bg-indigo-100 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
                     >
                         <Layout size={16} /> 首頁 (筆記)
                     </button>
-
+                    <button
+                        onClick={() => onShowLottery?.()}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors ${activeView === 'lottery' ? 'bg-amber-100 text-amber-700 font-medium' : 'text-slate-600 hover:bg-slate-100'}`}
+                    >
+                        <Gift size={16} /> 開獎情報
+                    </button>
                 </div>
             </div>
 

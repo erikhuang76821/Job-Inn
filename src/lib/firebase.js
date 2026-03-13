@@ -29,8 +29,8 @@ const appId = import.meta.env.VITE_APP_ID || 'job-inn';
 //   companies/{companyId}             ← 企業資訊
 //   salary_entries/{entryId}          ← 薪資情報
 //   discussions/{companyId}/messages/{messageId}  ← 討論串 (即時)
-//   lottery_posts/{companyId}/posts/{postId}      ← 開獎貼文
-//   lottery_posts/{companyId}/posts/{postId}/replies/{replyId} ← 開獎回覆
+//   lottery_posts/{postId}            ← 全域開獎貼文
+//   lottery_posts/{postId}/replies/{replyId} ← 開獎回覆
 
 const COLLECTIONS = {
     companies: 'companies',
@@ -38,8 +38,7 @@ const COLLECTIONS = {
     discussions: 'discussions',
     messages: 'messages',      // subcollection under discussions
     lotteryPosts: 'lottery_posts',
-    posts: 'posts',            // subcollection under lottery_posts
-    replies: 'replies',        // subcollection under posts
+    replies: 'replies',        // subcollection under lottery_posts
 };
 
 export {

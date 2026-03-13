@@ -22,6 +22,7 @@ import { generateCompanies, generateMockData } from './data/mockData';
 import Sidebar from './components/Sidebar';
 import BottomNav from './components/BottomNav';
 import CompanyDetailView from './components/CompanyDetailView';
+import LotteryView from './components/LotteryView';
 import CompanyAutocomplete from './components/CompanyAutocomplete';
 import InteractionSection from './components/InteractionSection';
 
@@ -41,7 +42,7 @@ export default function App() {
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
     // Navigation State
-    const [activeView, setActiveView] = useState('home'); // 'home' | 'company-detail'
+    const [activeView, setActiveView] = useState('home'); // 'home' | 'company-detail' | 'lottery'
     const [activeTab, setActiveTab] = useState('home');   // 'home' | 'settings'
     const [viewingCompany, setViewingCompany] = useState(null);
     const [isDiscussionTab, setIsDiscussionTab] = useState(false);
@@ -421,6 +422,16 @@ export default function App() {
     // --- Determine which main content to render ---
     const renderMainContent = () => {
         // Company detail view (drill-down from home)
+        if (activeView === 'lottery') {
+            return (
+                <LotteryView
+                    onBack={handleBackToHome}
+                    role={currentRole}
+                    currentUserId={currentUserId}
+                />
+            );
+        }
+
         if (activeView === 'company-detail' && viewingCompany) {
             return (
                 <CompanyDetailView
@@ -629,6 +640,7 @@ export default function App() {
                 requireLogin={requireLogin}
                 onShowSubmitModal={() => setShowSubmitModal(true)}
                 onShowSettingsModal={() => setShowSettingsModal(true)}
+                onShowLottery={() => setActiveView('lottery')}
                 onLogin={handleLogin}
                 onLogout={handleLogout}
                 onSetActiveTab={setActiveTab}
@@ -666,6 +678,7 @@ export default function App() {
                         requireLogin={requireLogin}
                         onShowSubmitModal={() => setShowSubmitModal(true)}
                         onShowSettingsModal={() => setShowSettingsModal(true)}
+                        onShowLottery={() => setActiveView('lottery')}
                     />
                 )}
             </div>

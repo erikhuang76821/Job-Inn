@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, Plus, Settings } from 'lucide-react';
+import { Home, Plus, Settings, Gift } from 'lucide-react';
 
-const BottomNav = ({ activeTab, setActiveTab, requireLogin, onShowSubmitModal, onShowSettingsModal, onBackToHome, filters, setFilters }) => (
+const BottomNav = ({ activeTab, setActiveTab, requireLogin, onShowSubmitModal, onShowSettingsModal, onShowLottery, onBackToHome, filters, setFilters }) => (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 h-16 flex items-center justify-around z-40 pb-safe">
         <button
             onClick={() => { setActiveTab('home'); setFilters({ ...filters, selectedCompany: null }); onBackToHome(); }}
@@ -9,6 +9,13 @@ const BottomNav = ({ activeTab, setActiveTab, requireLogin, onShowSubmitModal, o
         >
             <Home size={22} />
             <span className="text-[10px] font-medium">首頁</span>
+        </button>
+        <button
+            onClick={() => onShowLottery?.()}
+            className="flex flex-col items-center gap-1 text-slate-400"
+        >
+            <Gift size={22} className="text-amber-500" />
+            <span className="text-[10px] font-medium">開獎</span>
         </button>
         <button
             onClick={() => !requireLogin() && onShowSubmitModal()}

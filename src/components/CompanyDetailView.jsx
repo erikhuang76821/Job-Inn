@@ -3,7 +3,7 @@ import {
     ArrowLeft, Building2, Landmark, Edit3, Save,
     TrendingUp, BarChart3, Users, Briefcase, AlertTriangle,
     ArrowUpDown, Filter, Clock, ChevronDown, Loader2,
-    Reply, X, Send, Gift, Plus, MessageSquare, ChevronRight
+    Reply, X, Send
 } from 'lucide-react';
 import {
     db, COLLECTIONS,
@@ -13,8 +13,9 @@ import {
 import InteractionSection from './InteractionSection';
 import { Badge } from './ui';
 
-const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntries = [], onInteract, onDeleteInteraction, onLoginRequire }) => {
-    const [activeTab, setActiveTab] = useState('overview');
+const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntries = [], onInteract, onDeleteInteraction, onLoginRequire, onTabChange }) => {
+    const [activeTab, setActiveTabRaw] = useState('overview');
+    const setActiveTab = (tab) => { setActiveTabRaw(tab); onTabChange?.(tab); };
 
     // Stats Editing State
     const [isEditingStats, setIsEditingStats] = useState(false);
@@ -34,19 +35,6 @@ const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntrie
     const [showUserMenu, setShowUserMenu] = useState(null);
     const messagesEndRef = useRef(null);
     const chatInputRef = useRef(null);
-
-    // Lottery state
-    const [lotteryPosts, setLotteryPosts] = useState([]);
-    const [loadingLottery, setLoadingLottery] = useState(true);
-    const [showNewPostForm, setShowNewPostForm] = useState(false);
-    const [newPostTitle, setNewPostTitle] = useState('');
-    const [newPostContent, setNewPostContent] = useState('');
-    const [expandedPostId, setExpandedPostId] = useState(null);
-    const [postReplies, setPostReplies] = useState({});
-    const [loadingReplies, setLoadingReplies] = useState({});
-    const [replyInputs, setReplyInputs] = useState({});
-    const [replyTypes, setReplyTypes] = useState({});
-    const lotteryInputRef = useRef(null);
 
     // Extract unique titles from entries
     const uniqueTitles = useMemo(() => {
@@ -95,45 +83,6 @@ const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntrie
         return () => unsubscribe();
     }, [company?.id]);
 
-    // Real-time Firestore subscription for lottery posts
-    useEffect(() => {
-        if (!company?.id) return;
-        setLoadingLottery(true);
-        const q = query(
-            collection(db, COLLECTIONS.lotteryPosts, company.id, COLLECTIONS.posts),
-            orderBy('createdAt', 'desc')
-        );
-        const unsub = onSnapshot(q, snapshot => {
-            setLotteryPosts(snapshot.docs.map(d => {
-                const data = d.data();
-                return { id: d.id, ...data, time: data.createdAt?.toDate?.()?.toLocaleDateString?.('zh-TW') || '' };
-            }));
-            setLoadingLottery(false);
-        });
-        return () => unsub();
-    }, [company?.id]);
-
-    // Subscribe to replies for expanded lottery post
-    useEffect(() => {
-        if (!expandedPostId || !company?.id) return;
-        setLoadingReplies(prev => ({ ...prev, [expandedPostId]: true }));
-        const q = query(
-            collection(db, COLLECTIONS.lotteryPosts, company.id, COLLECTIONS.posts, expandedPostId, COLLECTIONS.replies),
-            orderBy('createdAt', 'asc')
-        );
-        const unsub = onSnapshot(q, snapshot => {
-            setPostReplies(prev => ({
-                ...prev,
-                [expandedPostId]: snapshot.docs.map(d => {
-                    const data = d.data();
-                    return { id: d.id, ...data, time: data.createdAt?.toDate?.()?.toLocaleTimeString?.('zh-TW', { hour: '2-digit', minute: '2-digit' }) || '' };
-                })
-            }));
-            setLoadingReplies(prev => ({ ...prev, [expandedPostId]: false }));
-        });
-        return () => unsub();
-    }, [expandedPostId, company?.id]);
-
     const formatTime = (timestamp) => {
         if (!timestamp?.seconds) return '剛剛';
         const date = new Date(timestamp.seconds * 1000);
@@ -178,53 +127,6 @@ const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntrie
             console.error('Failed to post comment:', error);
         }
     }, [newComment, commentType, company.id, currentUserId, role, replyTo]);
-
-    // --- Lottery Handlers ---
-    const handleCreatePost = useCallback(async () => {
-        if (!newPostTitle.trim() || !newPostContent.trim()) return;
-        if (role === 'guest') return;
-        const userName = `User_${currentUserId?.slice(-4) || 'TW'}`;
-        try {
-            const postsRef = collection(db, COLLECTIONS.lotteryPosts, company.id, COLLECTIONS.posts);
-            await addDoc(postsRef, {
-                title: newPostTitle.trim(),
-                content: newPostContent.trim(),
-                user: userName,
-                authorId: currentUserId || 'anonymous',
-                createdAt: serverTimestamp(),
-                replyCount: 0,
-            });
-            setNewPostTitle('');
-            setNewPostContent('');
-            setShowNewPostForm(false);
-        } catch (error) {
-            console.error('Failed to create lottery post:', error);
-        }
-    }, [newPostTitle, newPostContent, company.id, currentUserId, role]);
-
-    const handlePostReply = useCallback(async (postId) => {
-        const content = replyInputs[postId]?.trim();
-        if (!content) return;
-        if (role === 'guest') return;
-        const userName = `User_${currentUserId?.slice(-4) || 'TW'}`;
-        const type = replyTypes[postId] || '推';
-        try {
-            const repliesRef = collection(db, COLLECTIONS.lotteryPosts, company.id, COLLECTIONS.posts, postId, COLLECTIONS.replies);
-            await addDoc(repliesRef, {
-                type,
-                content,
-                user: userName,
-                authorId: currentUserId || 'anonymous',
-                createdAt: serverTimestamp(),
-            });
-            const postRef = doc(db, COLLECTIONS.lotteryPosts, company.id, COLLECTIONS.posts, postId);
-            const currentPost = lotteryPosts.find(p => p.id === postId);
-            await updateDoc(postRef, { replyCount: (currentPost?.replyCount || 0) + 1 });
-            setReplyInputs(prev => ({ ...prev, [postId]: '' }));
-        } catch (error) {
-            console.error('Failed to post reply:', error);
-        }
-    }, [replyInputs, replyTypes, company.id, currentUserId, role, lotteryPosts]);
 
     const handleUserClick = (e, msg) => {
         if (msg.authorId === currentUserId) return;
@@ -303,13 +205,6 @@ const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntrie
                     >
                         討論串
                         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="即時同步"></span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('lottery')}
-                        className={`pb-3 border-b-2 transition-colors flex items-center gap-1.5 ${activeTab === 'lottery' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'}`}
-                    >
-                        開獎
-                        <Gift size={14} />
                     </button>
                 </div>
             </div>
@@ -660,174 +555,6 @@ const CompanyDetailView = ({ company, onBack, role, currentUserId, companyEntrie
                                     </button>
                                 </div>
                             </div>
-                        </div>
-                    )}
-
-                    {/* ==================== Lottery Tab (開獎) ==================== */}
-                    {activeTab === 'lottery' && (
-                        <div className="space-y-4 animate-in fade-in zoom-in-95 pb-4">
-                            {/* New Post Button */}
-                            {role !== 'guest' && !showNewPostForm && (
-                                <button
-                                    onClick={() => setShowNewPostForm(true)}
-                                    className="w-full flex items-center gap-3 p-4 bg-white border-2 border-dashed border-slate-200 rounded-2xl hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
-                                        <Plus size={20} />
-                                    </div>
-                                    <span className="font-medium text-slate-600 group-hover:text-indigo-600 transition-colors">發布開獎情報</span>
-                                </button>
-                            )}
-
-                            {/* New Post Form */}
-                            {showNewPostForm && (
-                                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in slide-in-from-top-2 fade-in">
-                                    <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-                                        <div className="flex items-center gap-2">
-                                            <Gift className="text-amber-500" size={18} />
-                                            <h3 className="font-bold text-slate-700">發布開獎情報</h3>
-                                        </div>
-                                        <button onClick={() => setShowNewPostForm(false)} className="p-1 hover:bg-slate-200 rounded-full">
-                                            <X size={18} className="text-slate-400" />
-                                        </button>
-                                    </div>
-                                    <div className="p-4 space-y-3">
-                                        <input
-                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
-                                            placeholder="標題，例：113年年終開獎"
-                                            value={newPostTitle}
-                                            onChange={e => setNewPostTitle(e.target.value)}
-                                        />
-                                        <textarea
-                                            className="w-full p-3 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm h-28 resize-none"
-                                            placeholder="開獎內容，例：保底2個月、績效1-4個月..."
-                                            value={newPostContent}
-                                            onChange={e => setNewPostContent(e.target.value)}
-                                        />
-                                        <div className="flex gap-2 justify-end">
-                                            <button
-                                                onClick={() => setShowNewPostForm(false)}
-                                                className="px-4 py-2 text-sm text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
-                                            >取消</button>
-                                            <button
-                                                onClick={handleCreatePost}
-                                                disabled={!newPostTitle.trim() || !newPostContent.trim()}
-                                                className="px-5 py-2 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 shadow-sm disabled:opacity-40 transition-all"
-                                            >發布</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Loading */}
-                            {loadingLottery && (
-                                <div className="flex justify-center py-10">
-                                    <Loader2 className="animate-spin text-indigo-500" />
-                                </div>
-                            )}
-
-                            {/* Empty State */}
-                            {!loadingLottery && lotteryPosts.length === 0 && (
-                                <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
-                                    <Gift size={40} className="mx-auto mb-3 text-slate-300" />
-                                    <p className="text-slate-500 font-medium">尚無開獎情報</p>
-                                    <p className="text-xs text-slate-400 mt-1">成為第一個分享開獎結果的人！</p>
-                                </div>
-                            )}
-
-                            {/* Posts List */}
-                            {lotteryPosts.map(post => (
-                                <div key={post.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                                    <div
-                                        className="p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
-                                        onClick={() => setExpandedPostId(expandedPostId === post.id ? null : post.id)}
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <Gift size={16} className="text-amber-500 shrink-0" />
-                                                    <h4 className="font-bold text-slate-800 truncate">{post.title}</h4>
-                                                </div>
-                                                <p className="text-sm text-slate-600 line-clamp-2 leading-relaxed">{post.content}</p>
-                                            </div>
-                                            <ChevronRight size={18} className={`text-slate-400 shrink-0 transition-transform mt-1 ${expandedPostId === post.id ? 'rotate-90' : ''}`} />
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-3 text-xs text-slate-400">
-                                            <span className="font-medium text-slate-500">{post.user}</span>
-                                            <span>{post.time}</span>
-                                            <span className="flex items-center gap-1 ml-auto">
-                                                <MessageSquare size={12} />
-                                                {post.replyCount || 0} 則回覆
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* Expanded: Replies */}
-                                    {expandedPostId === post.id && (
-                                        <div className="border-t border-slate-100 animate-in slide-in-from-top-1 fade-in">
-                                            <div className="bg-slate-900 font-mono">
-                                                <div className="px-4 py-2 text-xs text-slate-500 border-b border-slate-800">回覆</div>
-                                                <div className="p-3 space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar">
-                                                    {loadingReplies[post.id] && (
-                                                        <div className="flex justify-center py-4">
-                                                            <Loader2 size={16} className="animate-spin text-slate-500" />
-                                                        </div>
-                                                    )}
-                                                    {!loadingReplies[post.id] && (!postReplies[post.id] || postReplies[post.id].length === 0) && (
-                                                        <div className="text-slate-600 text-xs text-center py-4">尚無回覆</div>
-                                                    )}
-                                                    {(postReplies[post.id] || []).map(reply => (
-                                                        <div key={reply.id} className="flex gap-2 text-sm">
-                                                            <span className={`shrink-0 font-bold ${reply.type === '推' ? 'text-emerald-400' : reply.type === '噓' ? 'text-red-500' : 'text-yellow-400'}`}>
-                                                                {reply.type}
-                                                            </span>
-                                                            <span className="text-cyan-400 shrink-0">{reply.user}:</span>
-                                                            <span className="text-slate-300 break-all flex-1">{reply.content}</span>
-                                                            <span className="text-slate-600 text-xs shrink-0">{reply.time}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                {/* Reply Input */}
-                                                {role !== 'guest' && (
-                                                    <div className="p-3 border-t border-slate-800">
-                                                        <div className="flex gap-2 mb-2">
-                                                            {['推', '→', '噓'].map(type => (
-                                                                <button
-                                                                    key={type}
-                                                                    onClick={() => setReplyTypes(prev => ({ ...prev, [post.id]: type }))}
-                                                                    className={`px-2.5 py-0.5 rounded text-xs font-bold transition-colors ${(replyTypes[post.id] || '推') === type
-                                                                        ? (type === '推' ? 'bg-emerald-600 text-white' : type === '噓' ? 'bg-red-600 text-white' : 'bg-yellow-600 text-white')
-                                                                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                                                                        }`}
-                                                                >
-                                                                    {type}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <input
-                                                                ref={lotteryInputRef}
-                                                                className="flex-1 bg-slate-800 border border-slate-700 rounded p-2 text-slate-200 text-sm outline-none focus:border-slate-500 placeholder:text-slate-600"
-                                                                placeholder="輸入回覆..."
-                                                                value={replyInputs[post.id] || ''}
-                                                                onChange={e => setReplyInputs(prev => ({ ...prev, [post.id]: e.target.value }))}
-                                                                onKeyDown={e => e.key === 'Enter' && handlePostReply(post.id)}
-                                                            />
-                                                            <button
-                                                                onClick={() => handlePostReply(post.id)}
-                                                                disabled={!replyInputs[post.id]?.trim()}
-                                                                className="px-3 py-2 bg-slate-700 text-slate-200 rounded hover:bg-slate-600 text-sm font-bold disabled:opacity-40"
-                                                            >
-                                                                送出
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
                         </div>
                     )}
                 </div>
