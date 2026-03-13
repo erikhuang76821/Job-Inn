@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
-    MessageCircle, Send, Reply, X, ChevronDown, Loader2, Users
+    MessageCircle, Send, Reply, X, ChevronDown, Loader2
 } from 'lucide-react';
 import {
     db, COLLECTIONS,
@@ -14,7 +14,6 @@ const ChatRoom = ({ companies, currentUserId, role }) => {
     const [newMessage, setNewMessage] = useState('');
     const [commentType, setCommentType] = useState('推');
     const [replyTo, setReplyTo] = useState(null); // { id, userName, content }
-    const [showUserMenu, setShowUserMenu] = useState(null); // { userName, messageId, x, y }
     const messagesEndRef = useRef(null);
     const chatContainerRef = useRef(null);
 
@@ -107,25 +106,12 @@ const ChatRoom = ({ companies, currentUserId, role }) => {
         }
     }, [newMessage, commentType, selectedCompanyId, currentUserId, role, replyTo]);
 
-    const handleUserClick = (e, msg) => {
-        if (msg.authorId === currentUserId) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        setShowUserMenu({
-            userName: msg.user,
-            messageId: msg.id,
-            content: msg.content,
-            x: rect.left,
-            y: rect.bottom + 4,
-        });
-    };
-
     const handleReply = (msg) => {
         setReplyTo({
-            id: msg.messageId || msg.id,
-            userName: msg.userName || msg.user,
+            id: msg.id,
+            userName: msg.user,
             content: msg.content,
         });
-        setShowUserMenu(null);
     };
 
     return (
@@ -197,9 +183,7 @@ const ChatRoom = ({ companies, currentUserId, role }) => {
                             </div>
                             <div className="flex-1 text-slate-700 break-all">
                                 <span
-                                    className={`chat-username font-medium mr-2 ${msg.authorId !== currentUserId ? 'cursor-pointer hover-underline' : 'text-indigo-600'
-                                        }`}
-                                    onClick={(e) => msg.authorId !== currentUserId && handleUserClick(e, msg)}
+                                    className={`chat-username font-medium mr-2 ${msg.authorId !== currentUserId ? '' : 'text-indigo-600'}`}
                                 >
                                     {msg.user}:
                                 </span>
@@ -213,36 +197,6 @@ const ChatRoom = ({ companies, currentUserId, role }) => {
                 ))}
                 <div ref={messagesEndRef} />
             </div>
-
-            {/* User Menu Popup */}
-            {showUserMenu && (
-                <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(null)} />
-                    <div
-                        className="fixed z-50 bg-white rounded-xl shadow-xl border border-slate-200 py-2 min-w-[160px] animate-in fade-in zoom-in-95"
-                        style={{ left: Math.min(showUserMenu.x, window.innerWidth - 180), top: showUserMenu.y }}
-                    >
-                        <div className="px-3 py-2 text-xs text-slate-400 font-medium border-b border-slate-100">
-                            @{showUserMenu.userName}
-                        </div>
-                        <button
-                            className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                            onClick={() => {
-                                setNewMessage(prev => `@${showUserMenu.userName} ${prev}`);
-                                setShowUserMenu(null);
-                            }}
-                        >
-                            <Users size={14} /> 選人 (提及)
-                        </button>
-                        <button
-                            className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 flex items-center gap-2 text-slate-700"
-                            onClick={() => handleReply(showUserMenu)}
-                        >
-                            <Reply size={14} /> 回覆此訊息
-                        </button>
-                    </div>
-                </>
-            )}
 
             {/* Input Area */}
             {selectedCompanyId && (

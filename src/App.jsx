@@ -44,6 +44,7 @@ export default function App() {
     const [activeView, setActiveView] = useState('home'); // 'home' | 'company-detail'
     const [activeTab, setActiveTab] = useState('home');   // 'home' | 'settings'
     const [viewingCompany, setViewingCompany] = useState(null);
+    const [isDiscussionTab, setIsDiscussionTab] = useState(false);
 
     // Modals & Navigation
     const [showLoginModal, setShowLoginModal] = useState(false);
@@ -222,6 +223,7 @@ export default function App() {
     const handleBackToHome = useCallback(() => {
         setViewingCompany(null);
         setActiveView('home');
+        setIsDiscussionTab(false);
     }, []);
 
     // --- Notifications ---
@@ -430,6 +432,9 @@ export default function App() {
                     onInteract={api.interact}
                     onDeleteInteraction={(id) => api.interact(id, null, null)}
                     onLoginRequire={() => setShowLoginModal(true)}
+                    companies={companies}
+                    onSwitchCompany={handleCompanyClick}
+                    onTabChange={(tab) => setIsDiscussionTab(tab === 'discussion')}
                 />
             );
         }
@@ -651,15 +656,18 @@ export default function App() {
                 {/* Content */}
                 {renderMainContent()}
 
-                <BottomNav
-                    activeTab={activeTab}
-                    setActiveTab={setActiveTab}
-                    filters={filters}
-                    setFilters={setFilters}
-                    onBackToHome={handleBackToHome}
-                    requireLogin={requireLogin}
-                    onShowSubmitModal={() => setShowSubmitModal(true)}
-                />
+                {!(activeView === 'company-detail' && isDiscussionTab) && (
+                    <BottomNav
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                        filters={filters}
+                        setFilters={setFilters}
+                        onBackToHome={handleBackToHome}
+                        requireLogin={requireLogin}
+                        onShowSubmitModal={() => setShowSubmitModal(true)}
+                        onShowSettingsModal={() => setShowSettingsModal(true)}
+                    />
+                )}
             </div>
 
             {/* Submit Modal */}
