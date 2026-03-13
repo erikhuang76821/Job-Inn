@@ -28,7 +28,7 @@ const InteractionSection = ({ entry, currentUserId, onInteract, onDelete, onLogi
     };
 
     return (
-        <div className="mt-4 pt-3 border-t border-slate-100">
+        <div className="mt-4 pt-3 border-t border-slate-100" onClick={(e) => e.stopPropagation()}>
             {/* Stats Header */}
             <div className="flex items-center justify-between mb-3 text-slate-500">
                 <div className="flex gap-4 text-xs font-medium">

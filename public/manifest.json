@@ -1,0 +1,19 @@
+{
+  "name": "Job-Inn — 薪資情報平台",
+  "short_name": "Job-Inn",
+  "description": "台灣職場薪資分享平台，匿名分享薪資情報與公司評價",
+  "start_url": "/Job-Inn/",
+  "scope": "/Job-Inn/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/Job-Inn/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
